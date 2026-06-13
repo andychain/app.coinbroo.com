@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useWalletClient } from 'wagmi'
 import { isNewUser, postExchange } from '@/lib/hyperliquid'
 import { signApproveBuilderFee } from '@/lib/signing'
@@ -8,7 +8,11 @@ import { signApproveBuilderFee } from '@/lib/signing'
 type OnboardState = 'idle' | 'checking' | 'approving' | 'done' | 'error' | 'dismissed'
 
 const STORAGE_KEY = 'ht_builder_approved'
-const DISMISSED_KEY = 'ht_onboard_dismissed'
+
+function getApprovedList(): string[] {
+  if (typeof window === 'undefined') return []
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+}
 
 export function useOnboarding() {
   const { data: walletClient } = useWalletClient()
@@ -17,51 +21,31 @@ export function useOnboarding() {
   const [isNew, setIsNew] = useState(false)
 
   const isApproved = useCallback((address: string): boolean => {
-    if (typeof window === 'undefined') return false
-    try {
-      const list: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-      return list.includes(address.toLowerCase())
-    } catch { return false }
-  }, [])
-
-  const isDismissed = useCallback((): boolean => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(DISMISSED_KEY) === 'true'
+    return getApprovedList().includes(address.toLowerCase())
   }, [])
 
   const markApproved = useCallback((address: string) => {
     if (typeof window === 'undefined') return
-    try {
-      const list: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-      if (!list.includes(address.toLowerCase())) {
-        list.push(address.toLowerCase())
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-      }
-    } catch {}
+    const list = getApprovedList()
+    if (!list.includes(address.toLowerCase())) {
+      list.push(address.toLowerCase())
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+    }
   }, [])
 
   const dismiss = useCallback(() => {
-    // User closed the modal — remember this so it doesn't re-appear on refresh
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DISMISSED_KEY, 'true')
-    }
     setState('dismissed')
   }, [])
 
   const retry = useCallback(() => {
-    // Clear dismissed state and go back to idle so modal re-shows
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(DISMISSED_KEY)
-    }
     setState('idle')
     setError(null)
   }, [])
 
   const runOnboarding = useCallback(async (address: string) => {
     if (!walletClient) return
-    if (isApproved(address)) return
-    if (isDismissed()) { setState('dismissed'); return }
-    if (state === 'checking' || state === 'approving') return
+    if (isApproved(address)) { setState('done'); return }
+    if (state === 'checking' || state === 'approving' || state === 'dismissed') return
 
     setState('checking')
     setError(null)
@@ -85,13 +69,13 @@ export function useOnboarding() {
       const isRejected = msg.includes('rejected') || msg.includes('denied') ||
         msg.includes('cancelled') || msg.includes('cancel') || msg.includes('User rejected')
       if (isRejected) {
-        setState('idle') // Go back to idle so user can connect again or dismiss
+        setState('idle')
       } else {
         setError(msg)
         setState('error')
       }
     }
-  }, [walletClient, isApproved, isDismissed, markApproved, state])
+  }, [walletClient, isApproved, markApproved, state])
 
-  return { state, error, isNew, runOnboarding, isApproved, isDismissed, dismiss, retry }
+  return { state, error, isNew, runOnboarding, isApproved, dismiss, retry }
 }
