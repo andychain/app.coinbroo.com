@@ -8,7 +8,7 @@ import { TradePanel } from '@/components/trading/TradePanel'
 import { Positions } from '@/components/trading/Positions'
 import { MarketList } from '@/components/trading/MarketList'
 import { useHLWebSocket } from '@/hooks/useHLWebSocket'
-import { getMeta, getAllMids } from '@/lib/hyperliquid'
+import { getMeta, getAllMids, getBaseFees } from '@/lib/hyperliquid'
 import type { OrderBook as OBType } from '@/hooks/useHLWebSocket'
 
 const DEFAULT_COINS = ['BTC', 'ETH', 'SOL', 'ARB', 'AVAX', 'HYPE', 'SUI', 'WIF', 'PEPE', 'DOGE']
@@ -29,12 +29,14 @@ export default function TradingPage() {
   const [mids, setMids] = useState<Record<string, number>>({})
   const [orderBook, setOrderBook] = useState<OBType | null>(null)
   const [priceHistory, setPriceHistory] = useState<Record<string, { price: number; prev: number }>>({})
+  const [baseFees, setBaseFees] = useState({ taker: 0.00045, maker: 0.00015 })
 
   // Load meta (market info) on mount
   useEffect(() => {
     getMeta().then(m => {
       if (m?.universe) setMeta(m)
     })
+    getBaseFees().then(setBaseFees)
     getAllMids().then(allMids => {
       const parsed: Record<string, number> = {}
       Object.entries(allMids).forEach(([k, v]) => {
@@ -164,6 +166,8 @@ export default function TradingPage() {
               markPrice={markPrice}
               assetIndex={meta.universe.findIndex(u => u.name === selectedCoin)}
               maxLeverage={currentAsset?.maxLeverage || 50}
+              baseTakerFee={baseFees.taker}
+              baseMakerFee={baseFees.maker}
               onOrderPlaced={() => {}}
             />
           </div>

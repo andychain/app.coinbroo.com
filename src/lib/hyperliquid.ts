@@ -49,6 +49,15 @@ export async function getReferralInfo(address: string) {
   return info({ type: 'referral', user: address })
 }
 
+export async function getBaseFees(): Promise<{ taker: number; maker: number }> {
+  // Use a zero address to get the base fee schedule without user-specific discounts
+  const data = await info({ type: 'userFees', user: '0x0000000000000000000000000000000000000000' })
+  return {
+    taker: parseFloat(data?.feeSchedule?.cross ?? '0.00045'),
+    maker: parseFloat(data?.feeSchedule?.add ?? '0.00015'),
+  }
+}
+
 // Check if a wallet is new to Hyperliquid (never traded)
 export async function isNewUser(address: string): Promise<boolean> {
   try {
