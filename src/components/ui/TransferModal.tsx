@@ -48,40 +48,35 @@ export function TransferModal({ availableBalance, initialTab = 'deposit', onClos
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: arbitrum.id,
-    query: { enabled: !!address },
+    query: { enabled: !!address && onArbitrum },
   })
 
   const usdcBalanceNum = usdcBalance ? parseFloat(formatUnits(usdcBalance, 6)) : 0
 
   async function handleDeposit() {
     if (!address || !amountNum) return
-    setStatus({ type: 'loading', msg: 'Approving USDC...' })
     try {
       if (!onArbitrum) {
         setStatus({ type: 'loading', msg: 'Switching to Arbitrum...' })
         await switchChain({ chainId: arbitrum.id })
-        return
       }
 
       const usdAmount = parseUnits(amount, 6)
 
+      setStatus({ type: 'loading', msg: 'Approving USDC...' })
       await writeContractAsync({
         address: USDC_ARBITRUM,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [HL_BRIDGE, usdAmount],
-        chainId: arbitrum.id,
       })
 
       setStatus({ type: 'loading', msg: 'Depositing...' })
-
       await writeContractAsync({
         address: HL_BRIDGE,
         abi: BRIDGE_ABI,
         functionName: 'deposit',
         args: [BigInt(Math.floor(amountNum * 1e6))],
-        chainId: arbitrum.id,
       })
 
       setStatus({ type: 'success', msg: `Deposited $${amount} USDC. It may take ~1 min to appear.` })
