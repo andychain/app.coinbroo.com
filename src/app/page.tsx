@@ -143,15 +143,13 @@ export default function TradingPage() {
               ${markPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          {/* TradingView widget placeholder */}
-          <div className="flex-1 flex items-center justify-center bg-bg-tertiary">
-            <div className="text-center">
-              <p className="text-text-muted text-sm mb-2">Chart</p>
-              <p className="text-text-muted text-xs">
-                Embed TradingView widget here:<br />
-                <code className="text-accent-blue text-2xs">new TradingView.widget(&#123; symbol: &quot;HYPERLIQUID:{selectedCoin}USDT&quot; &#125;)</code>
-              </p>
-            </div>
+          {/* TradingView chart */}
+          <div className="flex-1 relative">
+            <iframe
+              key={selectedCoin}
+              src={`https://www.tradingview.com/widgetembed/?symbol=BYBIT%3A${selectedCoin}USDT.P&interval=15&theme=dark&style=1&locale=en&hide_side_toolbar=0&allow_symbol_change=0`}
+              className="w-full h-full border-0"
+            />
           </div>
         </div>
 
