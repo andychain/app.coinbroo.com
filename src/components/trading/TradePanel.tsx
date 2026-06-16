@@ -33,37 +33,53 @@ function fmtPrice(p: number) {
 export function TradePanel({ coin, markPrice, assetIndex, maxLeverage, baseTakerFee = 0.00045, baseMakerFee = 0.00015, onOrderPlaced }: TradePanelProps) {
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
-  const { availableBalance, refresh } = useAccount_HL()
+  const { availableBalance, positions, refresh } = useAccount_HL()
   const { state, error, isNew, isApproved, ensureApproved, reset } = useOnboarding()
 
   const [side, setSide] = useState<Side>('long')
-  const [orderType, setOrderType] = useState<OrderType>('market')
+  const [orderType, setOrderType] = useState<OrderType>('limit')
   const [sizeUsd, setSizeUsd] = useState('')
   const [limitPrice, setLimitPrice] = useState('')
   const [leverage, setLeverage] = useState(10)
+  const [marginMode, setMarginMode] = useState<'cross' | 'isolated'>('cross')
+  const [reduceOnly, setReduceOnly] = useState(false)
+  const [sizePct, setSizePct] = useState(0)
+  const [showLevPicker, setShowLevPicker] = useState(false)
   const [placing, setPlacing] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const isLong = side === 'long'
+  const clampedLev = Math.min(Math.max(leverage, 1), maxLeverage)
   const takerFeeStr = ((baseTakerFee + BUILDER_RATE) * 100).toFixed(4) + '%'
   const makerFeeStr = ((baseMakerFee + BUILDER_RATE) * 100).toFixed(4) + '%'
-  const clampedLeverage = Math.min(Math.max(leverage, 1), maxLeverage)
 
-  const orderValue = useMemo(() => (parseFloat(sizeUsd) || 0) * clampedLeverage, [sizeUsd, clampedLeverage])
+  const currentPosition = positions.find(p => p.coin === coin)
+  const positionSize = currentPosition ? parseFloat(currentPosition.szi) : 0
+
+  const margin = parseFloat(sizeUsd) || 0
+  const orderValue = margin * clampedLev
 
   const sizeCoin = useMemo(() => {
-    const usd = parseFloat(sizeUsd) || 0
     const px = orderType === 'limit' ? parseFloat(limitPrice) || markPrice : markPrice
-    return px === 0 ? 0 : (usd * clampedLeverage) / px
-  }, [sizeUsd, clampedLeverage, limitPrice, markPrice, orderType])
+    return px === 0 ? 0 : orderValue / px
+  }, [orderValue, limitPrice, markPrice, orderType])
 
   const liqPrice = useMemo(() => {
     if (!sizeCoin || !markPrice) return null
-    const liqPct = (1 / clampedLeverage) * 0.9
+    const liqPct = (1 / clampedLev) * 0.9
     return isLong ? markPrice * (1 - liqPct) : markPrice * (1 + liqPct)
-  }, [sizeCoin, markPrice, clampedLeverage, isLong])
+  }, [sizeCoin, markPrice, clampedLev, isLong])
 
-  const margin = useMemo(() => (parseFloat(sizeUsd) || 0), [sizeUsd])
+  function applyPct(pct: number) {
+    setSizePct(pct)
+    if (availableBalance > 0) {
+      setSizeUsd(((availableBalance * pct) / 100).toFixed(2))
+    }
+  }
+
+  function setMid() {
+    if (markPrice > 0) setLimitPrice(fmtPrice(markPrice))
+  }
 
   async function placeOrder() {
     if (!walletClient || !isConnected || !address) return
@@ -79,7 +95,7 @@ export function TradePanel({ coin, markPrice, assetIndex, maxLeverage, baseTaker
     setStatus(null)
     try {
       const px = orderType === 'limit' ? parseFloat(limitPrice) : undefined
-      const { action, nonce, signature } = await signOrder(walletClient, { coin, isBuy: isLong, sz: sizeCoin, px })
+      const { action, nonce, signature } = await signOrder(walletClient, { coin, isBuy: isLong, sz: sizeCoin, px, reduceOnly })
       const actionWithAsset = {
         ...action,
         orders: [{ ...(action as { orders: { a: number }[] }).orders[0], a: assetIndex }],
@@ -87,7 +103,7 @@ export function TradePanel({ coin, markPrice, assetIndex, maxLeverage, baseTaker
       const result = await postExchange(actionWithAsset, nonce, signature)
       if (result?.status === 'ok') {
         setStatus({ type: 'success', msg: `${isLong ? 'Long' : 'Short'} order placed!` })
-        setSizeUsd('')
+        setSizeUsd(''); setSizePct(0)
         onOrderPlaced?.()
         setTimeout(refresh, 1000)
       } else {
@@ -105,158 +121,156 @@ export function TradePanel({ coin, markPrice, assetIndex, maxLeverage, baseTaker
       <OnboardingModal state={state} isNew={isNew} error={error} onClose={reset} />
 
       <div className="flex flex-col h-full overflow-y-auto">
-        {/* Long / Short tabs */}
-        <div className="grid grid-cols-2 border-b border-border-primary flex-shrink-0">
+        {/* Margin mode / leverage / mode row */}
+        <div className="flex items-center gap-1.5 p-2 border-b border-border-primary flex-shrink-0">
           <button
-            onClick={() => setSide('long')}
-            className={`py-2.5 text-sm font-semibold transition-colors ${
-              isLong ? 'bg-long/10 text-long border-b-2 border-long' : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
-            }`}
+            onClick={() => setMarginMode(m => m === 'cross' ? 'isolated' : 'cross')}
+            className="flex-1 py-1.5 text-2xs font-semibold rounded bg-bg-tertiary text-text-secondary hover:bg-bg-hover transition-colors capitalize"
           >
-            Long
+            {marginMode}
           </button>
           <button
-            onClick={() => setSide('short')}
-            className={`py-2.5 text-sm font-semibold transition-colors ${
-              !isLong ? 'bg-short/10 text-short border-b-2 border-short' : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
-            }`}
+            onClick={() => setShowLevPicker(v => !v)}
+            className="flex-1 py-1.5 text-2xs font-semibold rounded bg-bg-tertiary text-accent-blue hover:bg-bg-hover transition-colors"
           >
-            Short
+            {clampedLev}x
           </button>
+          <span className="flex-1 py-1.5 text-2xs font-semibold rounded bg-bg-tertiary text-text-muted text-center">
+            Unified
+          </span>
         </div>
 
-        <div className="flex flex-col gap-3 p-3">
-          {/* Order type */}
-          <div className="flex gap-1 bg-bg-tertiary rounded-lg p-0.5">
-            {(['market', 'limit'] as OrderType[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setOrderType(t)}
-                className={`flex-1 py-1.5 text-xs rounded-md capitalize font-medium transition-colors ${
-                  orderType === t
-                    ? 'bg-bg-secondary text-text-primary shadow-sm'
-                    : 'text-text-muted hover:text-text-secondary'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+        {/* Leverage picker (expandable) */}
+        {showLevPicker && (
+          <div className="px-3 py-2.5 border-b border-border-primary flex-shrink-0">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-2xs text-text-muted">Leverage</span>
+              <span className="text-xs font-medium text-text-primary">{clampedLev}x</span>
+            </div>
+            <input
+              type="range" min={1} max={maxLeverage} value={leverage}
+              onChange={e => setLeverage(parseInt(e.target.value))}
+              className="w-full h-1 accent-accent-blue cursor-pointer"
+            />
+            <div className="flex justify-between mt-1 text-2xs text-text-muted">
+              <span>1x</span><span>{maxLeverage}x</span>
+            </div>
+          </div>
+        )}
+
+        {/* Order type tabs */}
+        <div className="flex items-center border-b border-border-primary flex-shrink-0">
+          {(['market', 'limit'] as OrderType[]).map(t => (
+            <button
+              key={t}
+              onClick={() => setOrderType(t)}
+              className={`px-3 py-2 text-xs font-medium capitalize transition-colors ${
+                orderType === t ? 'text-text-primary border-b-2 border-accent-blue -mb-px' : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-2.5 p-3">
+          {/* Buy/Long Sell/Short */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => setSide('long')}
+              className={`py-2 text-sm font-semibold rounded-md transition-colors ${
+                isLong ? 'bg-long text-bg-primary' : 'bg-bg-tertiary text-text-secondary hover:bg-bg-hover'
+              }`}
+            >
+              Buy / Long
+            </button>
+            <button
+              onClick={() => setSide('short')}
+              className={`py-2 text-sm font-semibold rounded-md transition-colors ${
+                !isLong ? 'bg-short text-bg-primary' : 'bg-bg-tertiary text-text-secondary hover:bg-bg-hover'
+              }`}
+            >
+              Sell / Short
+            </button>
           </div>
 
-          {/* Available balance */}
-          {isConnected && availableBalance > 0 && (
-            <div className="flex justify-between text-xs">
-              <span className="text-text-muted">Available</span>
-              <span className="text-text-secondary font-mono">${availableBalance.toFixed(2)} USDC</span>
+          {/* Available / position */}
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-text-muted">Available to Trade</span>
+              <span className="text-text-primary font-mono tabular-nums">{availableBalance.toFixed(2)} USDC</span>
             </div>
-          )}
+            <div className="flex justify-between">
+              <span className="text-text-muted">Current Position</span>
+              <span className="text-text-primary font-mono tabular-nums">{Math.abs(positionSize).toFixed(4)} {coin}</span>
+            </div>
+          </div>
 
-          {/* Limit price */}
+          {/* Price (limit only) */}
           {orderType === 'limit' && (
-            <div>
-              <label className="text-2xs text-text-muted block mb-1.5">Price (USD)</label>
+            <div className="relative">
+              <label className="text-2xs text-text-muted block mb-1">Price (USDC)</label>
               <input
                 type="number"
                 value={limitPrice}
                 onChange={e => setLimitPrice(e.target.value)}
                 placeholder={markPrice > 0 ? fmtPrice(markPrice) : '0.00'}
-                className="w-full bg-bg-tertiary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-border-secondary"
+                className="w-full bg-bg-tertiary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-border-secondary"
               />
+              <button
+                onClick={setMid}
+                className="absolute right-2 top-[26px] text-2xs text-accent-blue hover:text-accent-blue-dim font-medium"
+              >
+                Mid
+              </button>
             </div>
           )}
 
           {/* Size */}
           <div>
-            <div className="flex justify-between mb-1.5">
-              <label className="text-2xs text-text-muted">Size (USD)</label>
-              {availableBalance > 0 && (
-                <button
-                  onClick={() => setSizeUsd((availableBalance * 0.95).toFixed(2))}
-                  className="text-2xs text-accent-blue hover:text-blue-400"
-                >
-                  Max
-                </button>
-              )}
-            </div>
+            <label className="text-2xs text-text-muted block mb-1">Size (USD)</label>
             <input
               type="number"
               value={sizeUsd}
-              onChange={e => setSizeUsd(e.target.value)}
+              onChange={e => { setSizeUsd(e.target.value); setSizePct(0) }}
               placeholder="0.00"
-              className="w-full bg-bg-tertiary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-border-secondary"
+              className="w-full bg-bg-tertiary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-border-secondary"
             />
             {sizeCoin > 0 && (
               <p className="text-2xs text-text-muted mt-1">≈ {sizeCoin.toFixed(4)} {coin}</p>
             )}
           </div>
 
-          {/* Leverage slider */}
+          {/* Size % slider */}
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-2xs text-text-muted">Leverage</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min={1}
-                  max={maxLeverage}
-                  value={leverage}
-                  onChange={e => setLeverage(Math.min(maxLeverage, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="w-12 bg-bg-tertiary border border-border-primary rounded px-1.5 py-0.5 text-xs text-text-primary font-mono text-center focus:outline-none focus:border-border-secondary"
-                />
-                <span className="text-xs text-text-muted">x</span>
-              </div>
-            </div>
             <input
-              type="range"
-              min={1}
-              max={maxLeverage}
-              value={leverage}
-              onChange={e => setLeverage(parseInt(e.target.value))}
+              type="range" min={0} max={100} step={1} value={sizePct}
+              onChange={e => applyPct(parseInt(e.target.value))}
               className="w-full h-1 accent-accent-blue cursor-pointer"
             />
-            <div className="flex justify-between mt-1">
-              {[1, 25, 50, 75, 100].map(pct => {
-                const val = Math.max(1, Math.round((pct / 100) * maxLeverage))
-                return (
-                  <button
-                    key={pct}
-                    onClick={() => setLeverage(val)}
-                    className="text-2xs text-text-muted hover:text-text-secondary"
-                  >
-                    {pct}%
-                  </button>
-                )
-              })}
+            <div className="flex justify-between mt-1.5">
+              {[0, 25, 50, 75, 100].map(p => (
+                <button key={p} onClick={() => applyPct(p)} className="text-2xs text-text-muted hover:text-text-secondary">
+                  {p}%
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Order summary */}
-          <div className="bg-bg-tertiary rounded-lg p-2.5 space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-text-muted">Order value</span>
-              <span className="text-text-primary font-mono">${orderValue.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-text-muted">Margin</span>
-              <span className="text-text-primary font-mono">${margin.toFixed(2)}</span>
-            </div>
-            {liqPrice && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">Est. liq. price</span>
-                <span className="text-short font-mono">${fmtPrice(liqPrice)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-border-primary pt-1.5">
-              <span className="text-text-muted">Fees</span>
-              <span className="text-text-secondary font-mono">{takerFeeStr} / {makerFeeStr}</span>
-            </div>
-          </div>
+          {/* Reduce only */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={reduceOnly}
+              onChange={e => setReduceOnly(e.target.checked)}
+              className="w-3.5 h-3.5 accent-accent-blue"
+            />
+            <span className="text-xs text-text-secondary">Reduce Only</span>
+          </label>
 
           {/* Status */}
           {status && (
-            <div className={`text-xs px-3 py-2 rounded-lg ${
-              status.type === 'success' ? 'bg-long-bg text-long' : 'bg-short-bg text-short'
-            }`}>
+            <div className={`text-xs px-3 py-2 rounded-md ${status.type === 'success' ? 'bg-long-bg text-long' : 'bg-short-bg text-short'}`}>
               {status.msg}
             </div>
           )}
@@ -266,17 +280,37 @@ export function TradePanel({ coin, markPrice, assetIndex, maxLeverage, baseTaker
             <button
               onClick={placeOrder}
               disabled={placing || !sizeUsd}
-              className={`w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`w-full py-2.5 rounded-md text-sm font-semibold text-bg-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 isLong ? 'bg-long hover:bg-long-dim' : 'bg-short hover:bg-short-dim'
               }`}
             >
               {placing ? 'Placing...' : `${isLong ? 'Buy / Long' : 'Sell / Short'} ${coin}`}
             </button>
           ) : (
-            <button className="w-full py-2.5 rounded-lg text-sm font-semibold text-text-muted border border-border-primary cursor-default">
-              Connect wallet to trade
+            <button className="w-full py-2.5 rounded-md text-sm font-semibold text-bg-primary bg-accent-blue cursor-default">
+              Connect to Trade
             </button>
           )}
+
+          {/* Footer details */}
+          <div className="space-y-1.5 text-xs pt-1 border-t border-border-primary">
+            <div className="flex justify-between">
+              <span className="text-text-muted">Liquidation Price</span>
+              <span className="font-mono text-text-secondary tabular-nums">{liqPrice ? `$${fmtPrice(liqPrice)}` : 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Order Value</span>
+              <span className="font-mono text-text-secondary tabular-nums">{orderValue > 0 ? `$${orderValue.toFixed(2)}` : 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Margin Required</span>
+              <span className="font-mono text-text-secondary tabular-nums">{margin > 0 ? `$${margin.toFixed(2)}` : 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Fees</span>
+              <span className="font-mono text-text-secondary tabular-nums">{takerFeeStr} / {makerFeeStr}</span>
+            </div>
+          </div>
         </div>
       </div>
     </>

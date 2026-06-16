@@ -72,7 +72,7 @@ export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, fundin
         <div className="flex items-center gap-5 flex-1 overflow-hidden">
           {stats.map(s => (
             <div key={s.label} className="flex flex-col flex-shrink-0">
-              <span className="text-2xs text-text-muted leading-none mb-0.5">{s.label}</span>
+              <span className="text-2xs text-text-muted leading-none mb-1 border-b border-dotted border-border-secondary pb-0.5 w-fit">{s.label}</span>
               <span className={`text-xs font-mono font-medium leading-none ${s.color}`}>{s.value}</span>
             </div>
           ))}

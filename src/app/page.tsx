@@ -9,7 +9,7 @@ import { MarketList } from '@/components/trading/MarketList'
 import { useHLWebSocket } from '@/hooks/useHLWebSocket'
 import { useAutoDisconnect } from '@/hooks/useAutoDisconnect'
 import { getMetaAndAssetCtxs, getBaseFees } from '@/lib/hyperliquid'
-import type { OrderBook as OBType } from '@/hooks/useHLWebSocket'
+import type { OrderBook as OBType, Trade } from '@/hooks/useHLWebSocket'
 import type { AssetCtx } from '@/lib/hyperliquid'
 
 const DEFAULT_COINS = ['BTC', 'ETH', 'SOL', 'ARB', 'AVAX', 'HYPE', 'SUI', 'WIF', 'PEPE', 'DOGE']
@@ -31,6 +31,7 @@ export default function TradingPage() {
   const [mids, setMids] = useState<Record<string, number>>({})
   // Store order books per coin so switching is instant
   const [orderBooks, setOrderBooks] = useState<Record<string, OBType>>({})
+  const [trades, setTrades] = useState<Record<string, Trade[]>>({})
   const [baseFees, setBaseFees] = useState({ taker: 0.00045, maker: 0.00015 })
   useAutoDisconnect()
 
@@ -55,6 +56,17 @@ export default function TradingPage() {
     setOrderBooks(prev => ({ ...prev, [data.coin]: data }))
   }, [])
 
+  const handleTrade = useCallback((data: Trade[]) => {
+    if (!data.length) return
+    const coin = data[0].coin
+    setTrades(prev => {
+      const existing = prev[coin] || []
+      // newest first, cap at 40
+      const merged = [...data.reverse(), ...existing].slice(0, 40)
+      return { ...prev, [coin]: merged }
+    })
+  }, [])
+
   const handleAllMids = useCallback((data: Record<string, string>) => {
     setMids(prev => {
       const next = { ...prev }
@@ -63,7 +75,7 @@ export default function TradingPage() {
     })
   }, [])
 
-  useHLWebSocket({ coins: DEFAULT_COINS, onOrderBook: handleOrderBook, onAllMids: handleAllMids })
+  useHLWebSocket({ coins: DEFAULT_COINS, onOrderBook: handleOrderBook, onTrade: handleTrade, onAllMids: handleAllMids })
 
   const currentAsset = meta.universe.find(u => u.name === selectedCoin)
   const currentCtx = assetCtxMap[selectedCoin]
@@ -115,8 +127,16 @@ export default function TradingPage() {
         </div>
 
         {/* Order book */}
-        <div className="w-40 flex-shrink-0 border-r border-border-primary hidden md:flex flex-col">
-          <OrderBook bids={bids} asks={asks} markPrice={markPrice} spread={spread} />
+        <div className="w-52 flex-shrink-0 border-r border-border-primary hidden md:flex flex-col">
+          <OrderBook
+            coin={selectedCoin}
+            bids={bids}
+            asks={asks}
+            markPrice={markPrice}
+            spread={spread}
+            trades={trades[selectedCoin] || []}
+            szDecimals={currentAsset?.szDecimals ?? 2}
+          />
         </div>
 
         {/* Chart */}
