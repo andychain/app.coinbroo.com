@@ -30,8 +30,45 @@ export async function getMeta() {
   return info({ type: 'meta' })
 }
 
-export async function getMetaAndAssetCtxs(): Promise<[{ universe: Market[] }, AssetCtx[]]> {
-  return info({ type: 'metaAndAssetCtxs' })
+export async function getMetaAndAssetCtxs(dex?: string): Promise<[{ universe: Market[] }, AssetCtx[]]> {
+  return info(dex ? { type: 'metaAndAssetCtxs', dex } : { type: 'metaAndAssetCtxs' })
+}
+
+// ─── Spot ─────────────────────────────────────────────────────────────────────
+
+export interface SpotToken {
+  name: string
+  index: number
+  szDecimals: number
+}
+
+export interface SpotPair {
+  name: string          // e.g. "PURR/USDC"
+  tokens: [number, number]
+  index: number
+}
+
+export interface SpotAssetCtx {
+  prevDayPx: string
+  dayNtlVlm: string
+  markPx: string
+  midPx: string
+  coin: string          // e.g. "PURR/USDC" or "@107"
+}
+
+export async function getSpotMetaAndAssetCtxs(): Promise<[{ tokens: SpotToken[]; universe: SpotPair[] }, SpotAssetCtx[]]> {
+  return info({ type: 'spotMetaAndAssetCtxs' })
+}
+
+// ─── Builder perp dexs (HIP-3) ────────────────────────────────────────────────
+
+export interface PerpDex {
+  name: string
+  fullName: string
+}
+
+export async function getPerpDexs(): Promise<(PerpDex | null)[]> {
+  return info({ type: 'perpDexs' })
 }
 
 export async function getAllMids(): Promise<Record<string, string>> {

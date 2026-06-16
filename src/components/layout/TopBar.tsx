@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useAccount_HL } from '@/hooks/useAccountHL'
 import { MarketList } from '@/components/trading/MarketList'
+import type { UnifiedMarket } from '@/hooks/useMarkets'
 
 function fmt(n: number, decimals = 2) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
@@ -19,43 +20,41 @@ function fmtPrice(p: number) {
   return p.toFixed(6)
 }
 
-interface MarketRow {
-  name: string
-  price: number
-  change24h: number
-  volume24h: number
-  funding: number
-  maxLeverage: number
-}
-
 interface TopBarProps {
-  selectedMarket: string
+  market?: UnifiedMarket
   markPrice: number
   change24h: number
-  prevDayPx: number
-  funding: number
-  volume24h: number
-  openInterest: number
-  maxLeverage: number
-  markets: MarketRow[]
+  markets: UnifiedMarket[]
   onSelectMarket: (coin: string) => void
 }
 
-export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, funding, volume24h, openInterest, maxLeverage, markets, onSelectMarket }: TopBarProps) {
+export function TopBar({ market, markPrice, change24h, markets, onSelectMarket }: TopBarProps) {
   const { isConnected } = useAccount()
   const { accountValue, totalPnl } = useAccount_HL()
   const [marketOpen, setMarketOpen] = useState(false)
 
   const isUp = change24h >= 0
-  const fundingPositive = funding >= 0
+  const fundingPositive = (market?.funding ?? 0) >= 0
+  const isPerp = market?.kind === 'perp' || market?.kind === 'dex'
 
-  const stats = [
+  // Pair label: perps → X-USDC, spot → X/USDC, dex → display
+  const pairLabel = !market
+    ? '—'
+    : market.kind === 'spot'
+      ? `${market.display}/USDC`
+      : market.kind === 'dex'
+        ? market.display
+        : `${market.display}-USDC`
+
+  const stats: { label: string; value: string; color: string }[] = [
     { label: '24h Change', value: `${isUp ? '+' : ''}${change24h.toFixed(2)}%`, color: isUp ? 'text-long' : 'text-short' },
-    { label: 'Prev Close', value: prevDayPx > 0 ? `$${fmtPrice(prevDayPx)}` : '—', color: 'text-text-primary' },
-    { label: '24h Volume', value: volume24h > 0 ? `$${fmt(volume24h)}` : '—', color: 'text-text-primary' },
-    { label: 'Open Interest', value: openInterest > 0 ? `$${fmt(openInterest * markPrice)}` : '—', color: 'text-text-primary' },
-    { label: 'Funding (1h)', value: `${fundingPositive ? '+' : ''}${(funding * 100).toFixed(4)}%`, color: fundingPositive ? 'text-long' : 'text-short' },
+    { label: 'Prev Close', value: market && market.prevDayPx > 0 ? `$${fmtPrice(market.prevDayPx)}` : '—', color: 'text-text-primary' },
+    { label: '24h Volume', value: market && market.volume24h > 0 ? `$${fmt(market.volume24h)}` : '—', color: 'text-text-primary' },
   ]
+  if (isPerp) {
+    stats.push({ label: 'Open Interest', value: market && market.openInterest > 0 ? `$${fmt(market.openInterest * markPrice)}` : '—', color: 'text-text-primary' })
+    stats.push({ label: 'Funding (1h)', value: `${fundingPositive ? '+' : ''}${((market?.funding ?? 0) * 100).toFixed(4)}%`, color: fundingPositive ? 'text-long' : 'text-short' })
+  }
 
   return (
     <>
@@ -66,8 +65,10 @@ export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, fundin
             onClick={() => setMarketOpen(o => !o)}
             className="flex items-center gap-2 hover:bg-bg-hover rounded-md px-2 py-1.5 -mx-2 transition-colors"
           >
-            <span className="text-text-primary font-bold text-base">{selectedMarket}-USDC</span>
-            <span className="text-[10px] text-text-secondary bg-bg-tertiary px-1.5 py-0.5 rounded leading-none">{maxLeverage}x</span>
+            <span className="text-text-primary font-bold text-base">{pairLabel}</span>
+            {market && market.maxLeverage > 0 && (
+              <span className="text-[10px] text-text-secondary bg-bg-tertiary px-1.5 py-0.5 rounded leading-none">{market.maxLeverage}x</span>
+            )}
             <svg className={`w-3.5 h-3.5 text-text-muted transition-transform ${marketOpen ? 'rotate-180' : ''}`} viewBox="0 0 12 12" fill="none">
               <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -111,7 +112,7 @@ export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, fundin
           <div className="fixed left-4 top-[88px] z-50 w-72 h-[440px] bg-bg-secondary border border-border-primary rounded-lg shadow-2xl flex flex-col overflow-hidden">
             <MarketList
               markets={markets}
-              selected={selectedMarket}
+              selected={market?.coin || ''}
               onSelect={(c) => { onSelectMarket(c); setMarketOpen(false) }}
             />
           </div>

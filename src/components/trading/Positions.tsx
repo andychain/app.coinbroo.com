@@ -9,7 +9,7 @@ import type { Position } from '@/lib/hyperliquid'
 
 interface PositionsProps {
   markPrices: Record<string, number>
-  meta: { universe: Array<{ name: string; szDecimals: number; maxLeverage: number }> }
+  assetIndexMap: Record<string, number>
 }
 
 function fmtPrice(p: number) {
@@ -84,7 +84,7 @@ function PositionRow({ pos, markPrice, assetIndex, walletClient, onClose }: {
   )
 }
 
-export function Positions({ markPrices, meta }: PositionsProps) {
+export function Positions({ markPrices, assetIndexMap }: PositionsProps) {
   const { positions, openOrders, fills, totalPnl, accountValue, availableBalance, refresh } = useAccount_HL()
   const { data: walletClient } = useWalletClient()
   const [tab, setTab] = useState<'positions' | 'orders' | 'history'>('positions')
@@ -158,7 +158,7 @@ export function Positions({ markPrices, meta }: PositionsProps) {
                     key={pos.coin}
                     pos={pos}
                     markPrice={markPrices[pos.coin] || 0}
-                    assetIndex={meta.universe.findIndex(u => u.name === pos.coin)}
+                    assetIndex={assetIndexMap[pos.coin] ?? -1}
                     walletClient={walletClient}
                     onClose={refresh}
                   />
