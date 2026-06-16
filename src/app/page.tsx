@@ -75,7 +75,7 @@ export default function TradingPage() {
   const spread = topAsk && topBid ? topAsk - topBid : 0
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-bg-primary">
       <NavBar />
       <TopBar
         market={market}
@@ -85,7 +85,8 @@ export default function TradingPage() {
         onSelectMarket={setSelectedCoin}
       />
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      {/* Trading row fills the first viewport; scroll down for positions/balances */}
+      <div className="flex h-[calc(100vh-6rem)] overflow-hidden flex-shrink-0">
         {/* Chart */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {market?.hasTvChart ? (
@@ -137,8 +138,8 @@ export default function TradingPage() {
         </div>
       </div>
 
-      {/* Positions bar */}
-      <div className="border-t border-border-primary flex-shrink-0 bg-bg-secondary">
+      {/* Positions / balances — revealed by scrolling down */}
+      <div className="border-t border-border-primary bg-bg-secondary">
         <Positions markPrices={mids} assetIndexMap={assetIndexMap} />
       </div>
     </div>
