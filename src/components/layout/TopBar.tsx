@@ -43,10 +43,9 @@ export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, fundin
 
   const stats = [
     { label: '24h Change', value: `${isUp ? '+' : ''}${change24h.toFixed(2)}%`, color: isUp ? 'text-long' : 'text-short' },
-    { label: '24h High', value: `$${fmtPrice(markPrice * 1.005)}`, color: 'text-text-primary' },
-    { label: '24h Low', value: `$${fmtPrice(prevDayPx > 0 ? prevDayPx * 0.995 : 0)}`, color: 'text-text-primary' },
-    { label: '24h Volume', value: `$${fmt(volume24h)}`, color: 'text-text-primary' },
-    { label: 'Open Interest', value: `$${fmt(openInterest * markPrice)}`, color: 'text-text-primary' },
+    { label: 'Prev Close', value: prevDayPx > 0 ? `$${fmtPrice(prevDayPx)}` : '—', color: 'text-text-primary' },
+    { label: '24h Volume', value: volume24h > 0 ? `$${fmt(volume24h)}` : '—', color: 'text-text-primary' },
+    { label: 'Open Interest', value: openInterest > 0 ? `$${fmt(openInterest * markPrice)}` : '—', color: 'text-text-primary' },
     { label: 'Funding (1h)', value: `${fundingPositive ? '+' : ''}${(funding * 100).toFixed(4)}%`, color: fundingPositive ? 'text-long' : 'text-short' },
   ]
 
@@ -54,11 +53,11 @@ export function TopBar({ selectedMarket, markPrice, change24h, prevDayPx, fundin
     <>
       <header className="h-11 flex items-center gap-0 px-3 bg-bg-secondary border-b border-border-primary flex-shrink-0 overflow-hidden">
         {/* Logo */}
-        <div className="flex items-center gap-2 mr-4 flex-shrink-0">
-          <div className="w-6 h-6 rounded-md bg-accent-blue flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{APP_NAME[0]}</span>
+        <div className="flex items-center gap-1.5 mr-4 flex-shrink-0">
+          <div className="w-6 h-6 rounded-md bg-accent-blue flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-black tracking-tighter">cb</span>
           </div>
-          <span className="text-text-primary font-semibold text-sm hidden sm:block">{APP_NAME}</span>
+          <span className="text-text-primary font-bold text-sm tracking-tight whitespace-nowrap">{APP_NAME}</span>
         </div>
 
         {/* Market + price */}

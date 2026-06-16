@@ -44,8 +44,8 @@ export function MarketList({ markets, selected, onSelect }: MarketListProps) {
 
       {/* Column labels */}
       <div className="flex items-center justify-between px-2 py-1 border-b border-border-primary flex-shrink-0">
-        <span className="text-2xs text-text-muted">Market</span>
-        <span className="text-2xs text-text-muted">Price / Chg</span>
+        <span className="text-2xs text-text-muted uppercase tracking-wider">Market</span>
+        <span className="text-2xs text-text-muted uppercase tracking-wider">Price</span>
       </div>
 
       {/* List */}

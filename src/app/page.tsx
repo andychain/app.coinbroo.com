@@ -29,7 +29,8 @@ export default function TradingPage() {
   const [meta, setMeta] = useState<Meta>({ universe: [] })
   const [assetCtxMap, setAssetCtxMap] = useState<Record<string, AssetCtx>>({})
   const [mids, setMids] = useState<Record<string, number>>({})
-  const [orderBook, setOrderBook] = useState<OBType | null>(null)
+  // Store order books per coin so switching is instant
+  const [orderBooks, setOrderBooks] = useState<Record<string, OBType>>({})
   const [baseFees, setBaseFees] = useState({ taker: 0.00045, maker: 0.00015 })
   useAutoDisconnect()
 
@@ -37,27 +38,26 @@ export default function TradingPage() {
     getMetaAndAssetCtxs().then(([m, ctxs]) => {
       if (m?.universe) setMeta(m)
       const ctxMap: Record<string, AssetCtx> = {}
-      m.universe.forEach((asset, i) => {
-        if (ctxs[i]) ctxMap[asset.name] = ctxs[i]
-      })
-      setAssetCtxMap(ctxMap)
-      // Seed mids from markPx
       const seedMids: Record<string, number> = {}
       m.universe.forEach((asset, i) => {
-        if (ctxs[i]) seedMids[asset.name] = parseFloat(ctxs[i].markPx)
+        if (ctxs[i]) {
+          ctxMap[asset.name] = ctxs[i]
+          seedMids[asset.name] = parseFloat(ctxs[i].markPx)
+        }
       })
+      setAssetCtxMap(ctxMap)
       setMids(seedMids)
     })
     getBaseFees().then(setBaseFees)
   }, [])
 
   const handleOrderBook = useCallback((data: OBType) => {
-    if (data.coin === selectedCoin) setOrderBook(data)
-  }, [selectedCoin])
+    setOrderBooks(prev => ({ ...prev, [data.coin]: data }))
+  }, [])
 
   const handleAllMids = useCallback((data: Record<string, string>) => {
     setMids(prev => {
-      const next: Record<string, number> = { ...prev }
+      const next = { ...prev }
       Object.entries(data).forEach(([k, v]) => { next[k] = parseFloat(v) })
       return next
     })
@@ -89,8 +89,9 @@ export default function TradingPage() {
       }
     })
 
-  const bids = orderBook?.levels?.[0] || []
-  const asks = orderBook?.levels?.[1] || []
+  const currentOB = orderBooks[selectedCoin]
+  const bids = currentOB?.levels?.[0] || []
+  const asks = currentOB?.levels?.[1] || []
   const topBid = bids[0] ? parseFloat(bids[0].px) : markPrice * 0.9995
   const topAsk = asks[0] ? parseFloat(asks[0].px) : markPrice * 1.0005
   const spread = topAsk - topBid
@@ -107,34 +108,28 @@ export default function TradingPage() {
         openInterest={openInterest}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Market list */}
         <div className="w-44 flex-shrink-0 border-r border-border-primary hidden lg:flex flex-col">
-          <MarketList
-            markets={markets}
-            selected={selectedCoin}
-            onSelect={setSelectedCoin}
-          />
+          <MarketList markets={markets} selected={selectedCoin} onSelect={setSelectedCoin} />
         </div>
 
         {/* Order book */}
-        <div className="w-44 flex-shrink-0 border-r border-border-primary hidden md:flex flex-col">
+        <div className="w-40 flex-shrink-0 border-r border-border-primary hidden md:flex flex-col">
           <OrderBook bids={bids} asks={asks} markPrice={markPrice} spread={spread} />
         </div>
 
         {/* Chart */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 relative">
-            <iframe
-              key={selectedCoin}
-              src={`https://www.tradingview.com/widgetembed/?symbol=BYBIT%3A${selectedCoin}USDT.P&interval=15&theme=dark&style=1&locale=en&hide_side_toolbar=0&allow_symbol_change=0`}
-              className="w-full h-full border-0"
-            />
-          </div>
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <iframe
+            key={selectedCoin}
+            src={`https://www.tradingview.com/widgetembed/?symbol=BYBIT%3A${selectedCoin}USDT.P&interval=15&theme=dark&style=1&locale=en&hide_side_toolbar=0&allow_symbol_change=0`}
+            className="w-full h-full border-0"
+          />
         </div>
 
         {/* Trade panel */}
-        <div className="w-56 flex-shrink-0 border-l border-border-primary flex flex-col">
+        <div className="w-60 flex-shrink-0 border-l border-border-primary flex flex-col min-h-0">
           <TradePanel
             coin={selectedCoin}
             markPrice={markPrice}
