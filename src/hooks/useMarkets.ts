@@ -5,6 +5,7 @@ import {
   getMetaAndAssetCtxs,
   getSpotMetaAndAssetCtxs,
 } from '@/lib/hyperliquid'
+import { COINBROO_VERIFIED_SPOT } from '@/lib/verifiedTokens'
 
 export type MarketCategory = 'Perps' | 'Spot'
 
@@ -26,6 +27,7 @@ export interface UnifiedMarket {
   kind: 'perp' | 'spot'
   baseToken?: string    // spot base token name (e.g. "PURR")
   marketCap?: number    // spot only
+  verified: boolean     // passes Strict filter (perp, HL-canonical, or Coinbroo-approved)
 }
 
 function num(s: string | undefined) { return s ? parseFloat(s) : 0 }
@@ -63,6 +65,7 @@ export function useMarkets() {
             tradable: true,
             hasTvChart: true,
             kind: 'perp',
+            verified: true,
           })
         })
       } catch { /* ignore */ }
@@ -85,6 +88,7 @@ export function useMarkets() {
           const prev = num(c.prevDayPx)
           const baseTok = tokenByIndex[pair.tokens[0]]
           const base = baseTok?.name || pair.name.split('/')[0]
+          const isCanonical = (pair as { isCanonical?: boolean }).isCanonical ?? false
           results.push({
             coin: coinKey,
             display: base,
@@ -103,6 +107,7 @@ export function useMarkets() {
             kind: 'spot',
             baseToken: base,
             marketCap: num(c.circulatingSupply) * price,
+            verified: isCanonical || COINBROO_VERIFIED_SPOT.has(base),
           })
         })
       } catch { /* ignore */ }

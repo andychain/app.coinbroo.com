@@ -64,8 +64,8 @@ export function MarketList({ markets, selected, onSelect }: MarketListProps) {
     const matchesCat = category === 'All' || m.category === category
     const q = search.toLowerCase()
     const matchesSearch = m.display.toLowerCase().includes(q) || m.coin.toLowerCase().includes(q)
-    // Strict hides dead / zero-volume (spammy) markets
-    const matchesStrict = !strict || m.volume24h > 0
+    // Strict shows only verified markets (perps, HL-canonical, or Coinbroo-approved)
+    const matchesStrict = !strict || m.verified
     return matchesCat && matchesSearch && matchesStrict
   })
   list = list.slice().sort((a, b) => {
