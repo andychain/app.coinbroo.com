@@ -66,21 +66,26 @@ export function useMarkets() {
         })
       } catch { /* ignore */ }
 
-      // 2. Spot — asset id for trading = 10000 + pair index
+      // 2. Spot — asset id for trading = 10000 + pair index.
+      // NOTE: spotCtxs is NOT positionally aligned with universe; match by coin id.
       try {
         const [spotMeta, spotCtxs] = await getSpotMetaAndAssetCtxs()
         const tokenByIndex: Record<number, { name: string; szDecimals: number }> = {}
         spotMeta.tokens.forEach(t => { tokenByIndex[t.index] = { name: t.name, szDecimals: t.szDecimals } })
-        spotMeta.universe.forEach((pair, i) => {
-          const c = spotCtxs[i]
+        const ctxByCoin: Record<string, typeof spotCtxs[number]> = {}
+        spotCtxs.forEach(c => { if (c && c.coin) ctxByCoin[c.coin] = c })
+
+        spotMeta.universe.forEach((pair) => {
+          // canonical pairs key on their name (e.g. "PURR/USDC"); others on "@index"
+          const coinKey = (pair as { isCanonical?: boolean }).isCanonical ? pair.name : `@${pair.index}`
+          const c = ctxByCoin[coinKey]
           if (!c) return
           const price = num(c.markPx)
           const prev = num(c.prevDayPx)
-          const baseTokenIdx = pair.tokens[0]
-          const baseTok = tokenByIndex[baseTokenIdx]
+          const baseTok = tokenByIndex[pair.tokens[0]]
           const base = baseTok?.name || pair.name.split('/')[0]
           results.push({
-            coin: c.coin || pair.name,
+            coin: coinKey,
             display: base,
             category: 'Spot',
             price,

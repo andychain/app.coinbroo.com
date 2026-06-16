@@ -46,6 +46,7 @@ export interface SpotPair {
   name: string          // e.g. "PURR/USDC"
   tokens: [number, number]
   index: number
+  isCanonical?: boolean
 }
 
 export interface SpotAssetCtx {
