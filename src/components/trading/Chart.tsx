@@ -67,8 +67,12 @@ export function Chart({ coin, label }: ChartProps) {
     if (!candleRef.current || !volRef.current) return
     let cancelled = false
 
+    // Pull the full history Hyperliquid allows (max ~5000 candles/request);
+    // older bars stay scrollable, view defaults to the most recent ones.
+    const MAX_CANDLES = 5000
+    const VISIBLE_BARS = 200
     const end = Date.now()
-    const start = end - INTERVAL_MS[interval] * 300
+    const start = end - INTERVAL_MS[interval] * MAX_CANDLES
 
     getCandleSnapshot(coin, interval, start, end).then(candles => {
       if (cancelled || !candleRef.current || !volRef.current) return
@@ -81,7 +85,12 @@ export function Chart({ coin, label }: ChartProps) {
         value: +c.v,
         color: +c.c >= +c.o ? 'rgba(31,185,138,0.4)' : 'rgba(237,112,136,0.4)',
       })))
-      chartRef.current?.timeScale().fitContent()
+      const n = candles.length
+      if (n > VISIBLE_BARS) {
+        chartRef.current?.timeScale().setVisibleLogicalRange({ from: n - VISIBLE_BARS, to: n })
+      } else {
+        chartRef.current?.timeScale().fitContent()
+      }
     }).catch(() => {})
 
     // Live candle updates
