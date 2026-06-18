@@ -113,7 +113,7 @@ export function MarketList({ markets, selected, onSelect }: MarketListProps) {
     return sortDir === 'asc' ? cmp : -cmp
   })
 
-  const pairSuffix = (m: UnifiedMarket) => (m.kind === 'spot' ? '/USDC' : '-USDC')
+  const pairSuffix = (m: UnifiedMarket) => (m.kind === 'spot' ? `/${m.quoteToken}` : '-USDC')
 
   const gridCols = isMobile
     ? 'grid-cols-[1.5fr_1fr_1.1fr]'

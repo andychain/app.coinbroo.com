@@ -26,6 +26,7 @@ export interface UnifiedMarket {
   hasTvChart: boolean   // TradingView/Bybit symbol available
   kind: 'perp' | 'spot'
   baseToken?: string    // spot base token name (e.g. "PURR")
+  quoteToken: string    // quote token name (perps: "USDC"; spot: USDC/USDT0/USDH/…)
   marketCap?: number    // spot only
   verified: boolean     // passes Strict filter (perp, HL-canonical, or Coinbroo-approved)
 }
@@ -65,6 +66,7 @@ export function useMarkets() {
             tradable: true,
             hasTvChart: true,
             kind: 'perp',
+            quoteToken: 'USDC',
             verified: true,
           })
         })
@@ -88,6 +90,7 @@ export function useMarkets() {
           const prev = num(c.prevDayPx)
           const baseTok = tokenByIndex[pair.tokens[0]]
           const base = baseTok?.name || pair.name.split('/')[0]
+          const quoteToken = tokenByIndex[pair.tokens[1]]?.name || 'USDC'
           const isCanonical = (pair as { isCanonical?: boolean }).isCanonical ?? false
           // Unit-bridged assets (fullName "Unit Bitcoin", …) show their original
           // ticker like Hyperliquid: UBTC → BTC, UETH → ETH, USOL → SOL.
@@ -110,16 +113,17 @@ export function useMarkets() {
             hasTvChart: false,
             kind: 'spot',
             baseToken: base,
+            quoteToken,
             marketCap: num(c.circulatingSupply) * price,
             verified: isCanonical || COINBROO_VERIFIED_SPOT.has(base),
           })
         })
       } catch { /* ignore */ }
 
-      // Hyperliquid spot token names are NOT unique — impersonator tokens can
-      // share a ticker (e.g. several "HYPE/USDC"). For the Strict list, keep only
-      // the genuine one per name (highest 24h volume) and demote the rest so they
-      // appear in "All" but not "Strict".
+      // The same spot token is often listed against several quote tokens
+      // (e.g. HYPE vs USDC / USDT0 / USDH / USDE). For the Strict list, keep only
+      // the primary pair per token (highest 24h volume — usually the USDC pair)
+      // and demote the alt-quote pairs so they appear in "All" but not "Strict".
       const bestVerifiedSpot: Record<string, UnifiedMarket> = {}
       for (const m of results) {
         if (m.kind !== 'spot' || !m.verified) continue

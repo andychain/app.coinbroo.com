@@ -51,7 +51,7 @@ export function TopBar({ market, markPrice, change24h, markets, onSelectMarket }
   const pairLabel = !market
     ? '—'
     : market.kind === 'spot'
-      ? `${market.display}/USDC`
+      ? `${market.display}/${market.quoteToken}`
       : `${market.display}-USDC`
 
   const stats: { label: string; value: string; color: string }[] = [

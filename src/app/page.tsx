@@ -78,7 +78,7 @@ export default function TradingPage() {
 
   const change24h = market && market.prevDayPx > 0 ? ((markPrice - market.prevDayPx) / market.prevDayPx) * 100 : (market?.change24h || 0)
   const spread = topAsk && topBid ? topAsk - topBid : 0
-  const pairLabel = market ? (market.kind === 'spot' ? `${market.display}/USDC` : `${market.display}-USDC`) : selectedCoin
+  const pairLabel = market ? (market.kind === 'spot' ? `${market.display}/${market.quoteToken}` : `${market.display}-USDC`) : selectedCoin
 
   // Shared panels — rendered into either the desktop columns or the mobile stack
   const chartEl = <Chart key={selectedCoin} coin={selectedCoin} label={pairLabel} />
