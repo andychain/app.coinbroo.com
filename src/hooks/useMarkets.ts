@@ -116,6 +116,22 @@ export function useMarkets() {
         })
       } catch { /* ignore */ }
 
+      // Hyperliquid spot token names are NOT unique — impersonator tokens can
+      // share a ticker (e.g. several "HYPE/USDC"). For the Strict list, keep only
+      // the genuine one per name (highest 24h volume) and demote the rest so they
+      // appear in "All" but not "Strict".
+      const bestVerifiedSpot: Record<string, UnifiedMarket> = {}
+      for (const m of results) {
+        if (m.kind !== 'spot' || !m.verified) continue
+        const best = bestVerifiedSpot[m.display]
+        if (!best || m.volume24h > best.volume24h) bestVerifiedSpot[m.display] = m
+      }
+      for (const m of results) {
+        if (m.kind === 'spot' && m.verified && bestVerifiedSpot[m.display] !== m) {
+          m.verified = false
+        }
+      }
+
       if (!cancelled) setMarkets(results)
     }
 
