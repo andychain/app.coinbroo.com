@@ -6,6 +6,15 @@ import { useState } from 'react'
 // for coins that have no icon (or if the request fails).
 export function TokenLogo({ symbol, size }: { symbol: string; size: number }) {
   const [errored, setErrored] = useState(false)
+  const [loadedSymbol, setLoadedSymbol] = useState(symbol)
+
+  // The instance is reused across market switches (e.g. in the TopBar), so reset
+  // the error flag whenever the symbol changes — otherwise a prior token's error
+  // would wrongly show the lettered fallback for a valid icon.
+  if (symbol !== loadedSymbol) {
+    setLoadedSymbol(symbol)
+    setErrored(false)
+  }
 
   if (!symbol || errored) {
     return (
@@ -21,6 +30,7 @@ export function TokenLogo({ symbol, size }: { symbol: string; size: number }) {
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
+      key={symbol}
       src={`https://app.hyperliquid.xyz/coins/${symbol}.svg`}
       alt={symbol}
       width={size}
