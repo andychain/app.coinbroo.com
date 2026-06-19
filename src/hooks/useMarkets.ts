@@ -33,6 +33,9 @@ export interface UnifiedMarket {
 
 function num(s: string | undefined) { return s ? parseFloat(s) : 0 }
 
+// Display aliases for bridged stablecoins, matching Hyperliquid's labels.
+const QUOTE_ALIAS: Record<string, string> = { USDT0: 'USDT' }
+
 export function useMarkets() {
   const [markets, setMarkets] = useState<UnifiedMarket[]>([])
 
@@ -76,8 +79,8 @@ export function useMarkets() {
       // NOTE: spotCtxs is NOT positionally aligned with universe; match by coin id.
       try {
         const [spotMeta, spotCtxs] = await getSpotMetaAndAssetCtxs()
-        const tokenByIndex: Record<number, { name: string; szDecimals: number; fullName?: string | null }> = {}
-        spotMeta.tokens.forEach(t => { tokenByIndex[t.index] = { name: t.name, szDecimals: t.szDecimals, fullName: t.fullName } })
+        const tokenByIndex: Record<number, { name: string; szDecimals: number; weiDecimals: number; fullName?: string | null }> = {}
+        spotMeta.tokens.forEach(t => { tokenByIndex[t.index] = { name: t.name, szDecimals: t.szDecimals, weiDecimals: t.weiDecimals, fullName: t.fullName } })
         const ctxByCoin: Record<string, typeof spotCtxs[number]> = {}
         spotCtxs.forEach(c => { if (c && c.coin) ctxByCoin[c.coin] = c })
 
@@ -90,8 +93,18 @@ export function useMarkets() {
           const prev = num(c.prevDayPx)
           const baseTok = tokenByIndex[pair.tokens[0]]
           const base = baseTok?.name || pair.name.split('/')[0]
-          const quoteToken = tokenByIndex[pair.tokens[1]]?.name || 'USDC'
+          const rawQuote = tokenByIndex[pair.tokens[1]]?.name || 'USDC'
+          // Alias bridged stablecoins to their familiar ticker like Hyperliquid
+          // (USDT0 is the LayerZero-bridged USDT on Hyperliquid).
+          const quoteToken = QUOTE_ALIAS[rawQuote] ?? rawQuote
           const isCanonical = (pair as { isCanonical?: boolean }).isCanonical ?? false
+
+          // Some tokens report circulatingSupply as the u64-max sentinel ("supply
+          // unknown"); guard against the resulting garbage market cap (show "—").
+          const circ = num(c.circulatingSupply)
+          const weiDec = baseTok?.weiDecimals ?? 0
+          const supplyUnknown = circ > 0 && (circ * Math.pow(10, weiDec)) / Math.pow(2, 64) > 0.99
+          const marketCap = supplyUnknown ? undefined : circ * price
           // Unit-bridged assets (fullName "Unit Bitcoin", …) show their original
           // ticker like Hyperliquid: UBTC → BTC, UETH → ETH, USOL → SOL.
           const isUnit = baseTok?.fullName?.startsWith('Unit ') ?? false
@@ -114,7 +127,7 @@ export function useMarkets() {
             kind: 'spot',
             baseToken: base,
             quoteToken,
-            marketCap: num(c.circulatingSupply) * price,
+            marketCap,
             verified: isCanonical || COINBROO_VERIFIED_SPOT.has(base),
           })
         })

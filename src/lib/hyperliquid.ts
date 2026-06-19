@@ -49,6 +49,7 @@ export interface SpotToken {
   name: string
   index: number
   szDecimals: number
+  weiDecimals: number
   fullName?: string | null
 }
 
