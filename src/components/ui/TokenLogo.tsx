@@ -35,7 +35,7 @@ export function TokenLogo({ symbol, size }: { symbol: string; size: number }) {
       width={size}
       height={size}
       onError={() => setErrored(true)}
-      className="rounded-full bg-bg-tertiary flex-shrink-0"
+      className="rounded-full flex-shrink-0"
     />
   )
 }
