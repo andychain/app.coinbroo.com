@@ -33,9 +33,8 @@ export function NavBar() {
 
         {/* Logo */}
         <div className="flex items-center gap-2 mr-3 md:mr-6 flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-accent-blue flex items-center justify-center">
-            <span className="text-bg-primary text-sm font-black tracking-tighter">cb</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={`${APP_NAME} logo`} className="w-7 h-7 object-contain" />
           <span className="text-text-primary font-bold text-base tracking-tight whitespace-nowrap">{APP_NAME}</span>
         </div>
 
